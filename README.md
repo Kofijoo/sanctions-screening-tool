@@ -43,7 +43,7 @@ SLST is an enterprise-grade sanctions list screening tool designed for financial
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/sanctions-screening-tool.git
+git clone https://github.com/Kofijoo/sanctions-screening-tool.git
 cd sanctions-screening-tool/sanction_screening
 
 # Install dependencies
