@@ -15,6 +15,7 @@ from ...preprocessing.processor import NameProcessor
 from ...matching.engine import MatchingEngine
 from ...flagging.engine import FlaggingEngine
 from ...ingestion.manager import ListManager
+from ...audit import audit_logger
 from ...config import settings
 
 app = typer.Typer(help="🛡️ SLST - Enterprise Sanctions Screening CLI")
@@ -60,7 +61,19 @@ def screen(
         final_result = flagging_engine.process_screening_result(screening_result)
         
         processing_time = (time.time() - start_time) * 1000
+        
+        # Log the screening event
+        screening_id = audit_logger.log_screening(
+            query=name,
+            screening_result=final_result,
+            processing_time_ms=processing_time,
+            user_id="CLI_USER"
+        )
+        
         progress.update(task2, description=f"✅ Screening completed ({processing_time:.1f}ms)")
+        
+        # Add screening_id to result for display
+        final_result['screening_id'] = screening_id
     
     # Display results
     display_screening_results(final_result, output, save, verbose, processing_time)
@@ -116,8 +129,18 @@ def batch(
             screening_result = matching_engine.screen_name(name, sanctions_df)
             final_result = flagging_engine.process_screening_result(screening_result)
             
+            # Log individual screening
+            screening_id = audit_logger.log_screening(
+                query=name,
+                screening_result=final_result,
+                processing_time_ms=0,  # Individual timing not tracked in batch
+                user_id="CLI_BATCH",
+                session_id=f"batch_{int(start_time)}"
+            )
+            
             # Flatten result for CSV
             result_row = {
+                'screening_id': screening_id,
                 'name': name,
                 'decision': final_result['decision']['action'],
                 'reason': final_result['decision']['reason'],
@@ -144,6 +167,15 @@ def batch(
     results_df.to_csv(output_file, index=False)
     
     processing_time = time.time() - start_time
+    
+    # Log batch completion
+    batch_summary = {
+        'total_processed': total_names,
+        'high_risk_count': len([r for r in results if r['risk_level'] == 'HIGH']),
+        'blocked_count': len([r for r in results if r['decision'] == 'BLOCK']),
+        'output_file': output_file
+    }
+    audit_logger.log_batch_screening(f"batch_{int(start_time)}", total_names, processing_time * 1000, batch_summary)
     
     # Summary
     summary_table = Table(title="Batch Processing Summary")
@@ -254,6 +286,7 @@ def display_screening_results(result, output_format, save_file, verbose, process
         }.get(decision['action'], 'white')
         
         result_panel = Panel(
+            f"[bold]Screening ID:[/bold] {result.get('screening_id', 'N/A')}\n"
             f"[bold]Query:[/bold] {result['query']}\n"
             f"[bold]Decision:[/bold] [{decision_color}]{decision['action']}[/{decision_color}]\n"
             f"[bold]Reason:[/bold] {decision['reason']}\n"

@@ -1,0 +1,1 @@
+{"screening_id": "e4eb33ea-ecc6-4692-9082-5653a238e0c8", "timestamp": "2025-08-06T20:29:32.582492", "event_type": "SCREENING", "query": "Osama bin Laden", "decision": "BLOCK", "risk_level": "HIGH", "matches_count": 1, "processing_time_ms": 50.0, "user_id": "TEST_USER", "session_id": null, "source_ip": null}
